@@ -25,6 +25,7 @@ def get_stations_status():
 
 
 def print_xml_data(data):
+    """Prints the list of stations from the current-status-xml-file on screen"""
     root = ElmTree.fromstring(data)
     print(root)
     for country in root:
