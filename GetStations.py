@@ -9,11 +9,16 @@ def get_url_from_db():
         conn = sqlite3.connect("login.db")
         c = conn.cursor()
         c.execute("SELECT urls.url FROM urls WHERE urls.name = 'StationList'")
-        url = c.fetchone()[0]
-        conn.close()
-        return url
+        try:
+            url = c.fetchone()[0]
+            conn.close()
+            return url
+        except TypeError:
+            print("ERROR: Could not fetch URL from Database login.db - Is it there?")
+            exit()
     except sqlite3.Error:
-        print("Error getting URL from Database")
+        print("Error Opening Database login.db")
+        exit()
 
 
 def get_stations_status():
