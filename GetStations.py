@@ -47,15 +47,15 @@ def connect_stations_db():
     conn = sqlite3.connect("stations.db")
     c = conn.cursor()
 
-    #check if station_info table is present and return connection object
+    # check if station_info table is present and return connection object
     try:
-        c.execute("SELECT * FROM places_data LIMIT 1")
-        return conn
-
+        c.execute("SELECT uid FROM places_data LIMIT 1")
     # if no station_info table, the database file did not exist. create station info and city infor table
     except sqlite3.OperationalError:
-        pass
-
+        c.execute("CREATE TABLE `places_data` (`uid` INTEGER NOT NULL,`number` INTEGER, `spot` INTEGER, "
+                  "`name` TEXT, `latitude` REAL, `longitude` REAL,`terminal_type` TEXT, PRIMARY KEY(`uid`))")
+    finally:
+        return conn
 
 
 if __name__ == '__main__':
