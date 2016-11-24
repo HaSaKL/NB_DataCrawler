@@ -42,6 +42,22 @@ def print_xml_data(data):
         print("----------------------------------------------------")
 
 
+def connect_stations_db():
+    """Returns a connection object to the bikes database after openen an existix or creating a new sqlite-file"""
+    conn = sqlite3.connect("stations.db")
+    c = conn.cursor()
+
+    #check if station_info table is present and return connection object
+    try:
+        c.execute("SELECT * FROM places_data LIMIT 1")
+        return conn
+
+    # if no station_info table, the database file did not exist. create station info and city infor table
+    except sqlite3.OperationalError:
+        pass
+
+
+
 if __name__ == '__main__':
     xml_data = get_stations_status()
     print_xml_data(xml_data)
