@@ -119,7 +119,7 @@ def update_country_info_from_xml(data, conn):
     conn.commit()
 
 
-def write_master_data_from_web_to_db():
+def init_DB():
     """Reads the general stations data from the web and writes it to the database"""
     print("Opening web connection and downloading stations data")
     xml_data, time = get_stations_status()
@@ -135,6 +135,11 @@ def write_master_data_from_web_to_db():
     print("Writing Country Data to Database...")
     update_country_info_from_xml(xml_data, conn)
     print("done.")
+
+
+def update_DB():
+    """"Updates the stations master data records"""
+    init_DB()
 
 
 if __name__ == '__main__':
