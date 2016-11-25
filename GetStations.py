@@ -32,6 +32,7 @@ def get_stations_status():
     query_time_start_pos = xml_tree.find("<!--")
     query_time_end_pos = xml_tree.find("-->")
     time_string = xml_tree[query_time_start_pos+5:query_time_end_pos-1]
+    # FIXME: What happens if the urllib.request.urlopen(url)-request went wrong? Then it should be repeated. One indicator could be, that the date (in an comment at the end of transmitted data) failed.
     query_time = datetime.datetime.strptime(time_string, "%d.%m.%Y %H:%M")
 
     return xml_tree, query_time
@@ -41,9 +42,9 @@ def print_xml_data(data):
     """Prints the list of stations from the current-status-xml-file on screen"""
     root = ElmTree.fromstring(data)
     print(root)
-    for country in root:
-        print(country.attrib.get("country_name"), ": ", country.attrib.get("name"))
-        for city in country:
+    for domain in root:
+        print(domain.attrib.get("country_name"), ": ", domain.attrib.get("name"))
+        for city in domain:
             print("\n", city.attrib.get("name"), "; ", city.tag, "-uid:", city.attrib.get("uid"))
             for place in city:
                 print(place.attrib.get("name"), "; ", place.tag, "-uid:", place.attrib.get("uid"))
@@ -52,23 +53,23 @@ def print_xml_data(data):
 
 def connect_stations_db():
     """Returns a connection object to the bikes database after openen an existix or creating a new sqlite-file"""
-    conn = sqlite3.connect("stations.db")
+    conn = sqlite3.connect("stations_master.db")
     c = conn.cursor()
 
     # check if station_info table is present and return connection object
     try:
-        c.execute("SELECT uid FROM places_data LIMIT 1")
+        c.execute("SELECT `uid` FROM `places_data` LIMIT 1")
     # if no station_info table, the database file did not exist. create station info and city infor table
     except sqlite3.OperationalError:
         c.execute("CREATE TABLE `places_data` (`uid` INTEGER NOT NULL,`number` INTEGER, `spot` INTEGER, "
                   "`name` TEXT, `latitude` REAL, `longitude` REAL,`terminal_type` TEXT, PRIMARY KEY(`uid`))")
         c.execute("CREATE TABLE `city_data` ( `uid` INTEGER NOT NULL, `name` TEXT,`num_places` INTEGER, "
                   "`latitude` REAL, `longitude` REAL, PRIMARY KEY(`uid`) )")
-        c.execute("CREATE TABLE `country_data` ( `domain` TEXT NOT NULL, `name` TEXT NOT NULL, "
+        c.execute("CREATE TABLE `domain_data` ( `domain` TEXT NOT NULL, `name` TEXT NOT NULL, "
                   "`country` TEXT NOT NULL, `latitute` REAL, `longitude` REAL, PRIMARY KEY(`domain`) )")
         c.execute("CREATE TABLE `places_cities_assignment` ( `place_uid` INTEGER NOT NULL, "
                   "`city_uid` INTEGER NOT NULL )")
-        c.execute("CREATE TABLE `cities_countries_assignment` ( `country` TEXT NOT NULL, `city_uid` INTEGER )")
+        c.execute("CREATE TABLE `cities_domains_assignment` ( `domain` TEXT NOT NULL, `city_uid` INTEGER )")
     finally:
         return conn
 
@@ -77,8 +78,8 @@ def update_city_info_from_xml(data, conn):
     """"Writes general city data from a provided xml-file to the database"""
     c = conn.cursor()
     root = ElmTree.fromstring(data)
-    for country in root:
-        for city in country:
+    for domain in root:
+        for city in domain:
             uid = city.attrib.get("uid")
             name = city.attrib.get("name")
             lat = city.attrib.get("lat")
@@ -92,8 +93,8 @@ def update_station_info_from_xml(data, conn):
     """Writes general stations data from a provided xml-file to the database """
     c = conn.cursor()
     root = ElmTree.fromstring(data)
-    for country in root:
-        for city in country:
+    for domain in root:
+        for city in domain:
             for place in city:
                 uid = place.attrib.get("uid")
                 number = place.attrib.get("number")
@@ -107,18 +108,45 @@ def update_station_info_from_xml(data, conn):
     conn.commit()
 
 
-def update_country_info_from_xml(data, conn):
+def update_domain_info_from_xml(data, conn):
     """"Writes general country data from a provided xml-file to the database """
     c = conn.cursor()
     root = ElmTree.fromstring(data)
-    for country_item in root:
-        domain = country_item.attrib.get("domain")
-        name = country_item.attrib.get("name")
-        country = country_item.attrib.get("country")
-        lat = country_item.attrib.get("lat")
-        lng = country_item.attrib.get("lng")
-        c.execute("INSERT OR IGNORE INTO country_data VALUES (?, ?, ?, ?, ?)",
-                  (domain, name, country, lat, lng))
+    for domain in root:
+        domain_item = domain.attrib.get("domain")
+        name = domain.attrib.get("name")
+        country = domain.attrib.get("country")
+        lat = domain.attrib.get("lat")
+        lng = domain.attrib.get("lng")
+        c.execute("INSERT OR IGNORE INTO domain_data VALUES (?, ?, ?, ?, ?)",
+                  (domain_item, name, country, lat, lng))
+    conn.commit()
+
+
+def update_cities_domain_assign_info_from_xml(data, conn):
+    """"Writes teh relation between cities and countries from a provided xml-file to the database"""
+    c = conn.cursor()
+    root = ElmTree.fromstring(data)
+    for domain in root:
+        for city in domain:
+            domain_item = domain.attrib.get("domain")
+            city_uid = city.attrib.get("uid")
+            c.execute("INSERT OR IGNORE INTO cities_domains_assignment VALUES (?,?)",
+                      (domain_item, city_uid))
+    conn.commit()
+
+
+def update_places_cities_assign_info_from_xml(data, conn):
+    """"Writes the relation between places and cities from a provided xml-file to the database """
+    c = conn.cursor()
+    root = ElmTree.fromstring(data)
+    for domain in root:
+        for city in domain:
+            for place in city:
+                place_uid = place.attrib.get("uid")
+                city_uid = city.attrib.get("uid")
+                c.execute("INSERT OR IGNORE INTO places_cities_assignment VALUES (?, ?)",
+                          (place_uid, city_uid))
     conn.commit()
 
 
@@ -136,7 +164,11 @@ def init_db():
     print("Writing Stations Data to Database...")
     update_station_info_from_xml(query_xml_string, conn)
     print("Writing Country Data to Database...")
-    update_country_info_from_xml(query_xml_string, conn)
+    update_domain_info_from_xml(query_xml_string, conn)
+    print("Writing places to city assignments...")
+    update_places_cities_assign_info_from_xml(query_xml_string, conn)
+    print("Writing cities to domain assignments...")
+    update_cities_domain_assign_info_from_xml(query_xml_string, conn)
     print("done.")
 
 
