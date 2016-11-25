@@ -31,10 +31,10 @@ def get_stations_status():
     # get the time of the query from the comment at the end of the file
     query_time_start_pos = xml_tree.find("<!--")
     query_time_end_pos = xml_tree.find("-->")
-    time_string = xml_tree[query_time_start_pos+5 : query_time_end_pos-1]
-    time = datetime.datetime.strptime(time_string, "%d.%m.%Y %H:%M")
+    time_string = xml_tree[query_time_start_pos+5:query_time_end_pos-1]
+    query_time = datetime.datetime.strptime(time_string, "%d.%m.%Y %H:%M")
 
-    return (xml_tree, time)
+    return xml_tree, query_time
 
 
 def print_xml_data(data):
@@ -119,30 +119,30 @@ def update_country_info_from_xml(data, conn):
     conn.commit()
 
 
-def init_DB():
+def init_db():
     """Reads the general stations data from the web and writes it to the database"""
     print("Opening web connection and downloading stations data")
-    xml_data, time = get_stations_status()
+    query_xml_string, query_time = get_stations_status()
     print("done.")
 
-    print("Time of query: ", time)
+    print("Time of query: ", query_time)
 
     print("Writing City Data to Database...")
     conn = connect_stations_db()
-    update_city_info_from_xml(xml_data, conn)
+    update_city_info_from_xml(query_xml_string, conn)
     print("Writing Stations Data to Database...")
-    update_station_info_from_xml(xml_data, conn)
+    update_station_info_from_xml(query_xml_string, conn)
     print("Writing Country Data to Database...")
-    update_country_info_from_xml(xml_data, conn)
+    update_country_info_from_xml(query_xml_string, conn)
     print("done.")
 
 
-def update_DB():
+def update_db():
     """"Updates the stations master data records"""
-    init_DB()
+    init_db()
 
 
 if __name__ == '__main__':
     xml_data, time = get_stations_status()
     print_xml_data(xml_data)
-    print("Time of query: ",time)
+    print("Time of query: ", time)
