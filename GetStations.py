@@ -66,6 +66,9 @@ def connect_stations_db():
                   "`latitude` REAL, `longitude` REAL, PRIMARY KEY(`uid`) )")
         c.execute("CREATE TABLE `country_data` ( `domain` TEXT NOT NULL, `name` TEXT NOT NULL, "
                   "`country` TEXT NOT NULL, `latitute` REAL, `longitude` REAL, PRIMARY KEY(`domain`) )")
+        c.execute("CREATE TABLE `places_cities_assignment` ( `place_uid` INTEGER NOT NULL, "
+                  "`city_uid` INTEGER NOT NULL )")
+        c.execute("CREATE TABLE `cities_countries_assignment` ( `country` TEXT NOT NULL, `city_uid` INTEGER )")
     finally:
         return conn
 
