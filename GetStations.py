@@ -54,6 +54,8 @@ def connect_stations_db():
     except sqlite3.OperationalError:
         c.execute("CREATE TABLE `places_data` (`uid` INTEGER NOT NULL,`number` INTEGER, `spot` INTEGER, "
                   "`name` TEXT, `latitude` REAL, `longitude` REAL,`terminal_type` TEXT, PRIMARY KEY(`uid`))")
+        c.execute("CREATE TABLE `city_data` ( `uid` INTEGER NOT NULL, `name` TEXT, `country` TEXT, "
+                  "`num_places` INTEGER, `latitude` REAL, `longitude` REAL, PRIMARY KEY(`uid`) )")
     finally:
         return conn
 
