@@ -32,7 +32,8 @@ def get_stations_status():
     query_time_start_pos = xml_tree.find("<!--")
     query_time_end_pos = xml_tree.find("-->")
     time_string = xml_tree[query_time_start_pos+5:query_time_end_pos-1]
-    # FIXME: What happens if the urllib.request.urlopen(url)-request went wrong? Then it should be repeated. One indicator could be, that the date (in an comment at the end of transmitted data) failed.
+    # FIXME: What happens if the urllib.request.urlopen(url)-request went wrong? Then it should be repeated.
+    # One indicator could be, that the date (in an comment at the end of transmitted data) failed.
     query_time = datetime.datetime.strptime(time_string, "%d.%m.%Y %H:%M")
 
     return xml_tree, query_time
@@ -154,6 +155,8 @@ def init_db():
     """Reads the general stations data from the web and writes it to the database"""
     print("Opening web connection and downloading stations data")
     query_xml_string, query_time = get_stations_status()
+    # FIXME: Better parse XML here and pass the parsed object instead of the xml_string further down.
+    # So the check for errors in loading the file and mybe try to repeat it. Even better: do it in get_stations_status()
     print("done.")
 
     print("Time of query: ", query_time)
