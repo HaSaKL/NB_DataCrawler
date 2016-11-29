@@ -34,17 +34,25 @@ def get_and_parse_station_status():
     """Returns an XML-object with the current status of all stations world-wide and a datetime of query as tuple"""
     success = False
     num_tries = 0
+    xml_root = None
 
+    # Get Information from the Web
+    xml_string = get_station_status()
+    assert isinstance(xml_string, str)
+
+    # Parse XML, an if necessary retry
     while not success and num_tries < 10:
-        xml_string = get_station_status()
         try:
-            xml_root_node = ElmTree.fromstring(xml_string)
+            xml_root = ElmTree.fromstring(xml_string)
             success = True
         except ElmTree.ParseError:
             success = False
             num_tries += 1
             print("Connection try ", num_tries - 1, "failed. Will try again")
+            xml_string = get_station_status()
+            assert isinstance(xml_string, str)
 
+    assert isinstance(xml_root, ElmTree.Element)
     if not success:
         raise ValueError('Could not get Station Data or Parse received XML-File')
 
@@ -54,7 +62,7 @@ def get_and_parse_station_status():
     time_string = xml_string[query_time_start_pos+5:query_time_end_pos-1]
     query_time = datetime.datetime.strptime(time_string, "%d.%m.%Y %H:%M")
 
-    return xml_root_node, query_time
+    return xml_root, query_time
 
 
 def print_xml_data(xml_root):
@@ -69,22 +77,23 @@ def print_xml_data(xml_root):
         print("----------------------------------------------------")
 
 
-def connect_stations_db():
-    """Returns a connection object to the bikes database after openen an existix or creating a new sqlite-file"""
+def connect_stations_master_db():
+    """Returns a connection object to the bikes database after opened an existing or creating a new sqlite-file"""
     conn = sqlite3.connect("stations_master.db")
     c = conn.cursor()
 
-    # check if station_info table is present and return connection object
+    # check if places_data table is present and return connection object
     try:
         c.execute("SELECT `uid` FROM `places_data` LIMIT 1")
-    # if no station_info table, the database file did not exist. create station info and city infor table
+    # if no places_data table, the database file did not exist. create station info, city info, domain info an all
+    # linking table and all other tables
     except sqlite3.OperationalError:
         c.execute("CREATE TABLE `places_data` (`uid` INTEGER NOT NULL,`number` INTEGER, `spot` INTEGER, "
                   "`name` TEXT, `latitude` REAL, `longitude` REAL,`terminal_type` TEXT, PRIMARY KEY(`uid`))")
         c.execute("CREATE TABLE `city_data` ( `uid` INTEGER NOT NULL, `name` TEXT,`num_places` INTEGER, "
                   "`latitude` REAL, `longitude` REAL, PRIMARY KEY(`uid`) )")
         c.execute("CREATE TABLE `domain_data` ( `domain` TEXT NOT NULL, `name` TEXT NOT NULL, "
-                  "`country` TEXT NOT NULL, `latitute` REAL, `longitude` REAL, PRIMARY KEY(`domain`) )")
+                  "`country` TEXT NOT NULL, `latitude` REAL, `longitude` REAL, PRIMARY KEY(`domain`) )")
         c.execute("CREATE TABLE `places_cities_assignment` ( `place_uid` INTEGER NOT NULL, "
                   "`city_uid` INTEGER NOT NULL, UNIQUE (`place_uid`, `city_uid`) )")
         c.execute("CREATE TABLE `cities_domains_assignment` ( `domain` TEXT NOT NULL, `city_uid` INTEGER, "
@@ -173,7 +182,7 @@ def init_db():
     print("Time of query: ", query_time)
 
     print("Writing City Data to Database...")
-    conn = connect_stations_db()
+    conn = connect_stations_master_db()
     update_city_info_from_xml(query_xml_root, conn)
     print("Writing Stations Data to Database...")
     update_station_info_from_xml(query_xml_root, conn)
@@ -186,12 +195,46 @@ def init_db():
     print("done.")
 
 
-def update_db():
+def update_master_data_db():
     """"Updates the stations master data records"""
     init_db()
 
 
+def connect_stations_transfer_db():
+    """"Returns a connection object to the bikes stations status database after opening an existing of creating a new
+    sqlite-file"""
+    conn = sqlite3.connect("stations_transactions.db")
+    c = conn.cursor()
+
+    # check if station status does exist. If not, make the table
+    try:
+        c.execute("SELECT * FROM`stations_fill` LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("CREATE TABLE `stations_fill` ( `timestamp` INTEGER NOT NULL, `place_uid` INTEGER NOT NULL, "
+                  "`bikes` INTEGER NOT NULL, UNIQUE ( `place_uid`, `timestamp`) ) ")
+    finally:
+        return conn
+
+
+def add_current_station_info():
+    """"Reads the current station status and writes query result into the transaction database"""
+    query_xml_root, query_time = get_and_parse_station_status()
+    conn = connect_stations_transfer_db()
+    c = conn.cursor()
+
+    print("Getting and writing data from ", query_time.timestamp())
+
+    # noinspection PyTypeChecker
+    for domain in query_xml_root:
+        for city in domain:
+            for place in city:
+                place_uid = place.attrib.get("uid")
+                bikes = place.attrib.get("bikes")
+                c.execute("INSERT OR IGNORE INTO `stations_fill` VALUES (?, ?, ?)",
+                          (int(query_time.timestamp()), place_uid, bikes))
+    conn.commit()
+
 if __name__ == '__main__':
-    xml_root, time = get_and_parse_station_status()
-    print_xml_data(xml_root)
+    xml_root_node, time = get_and_parse_station_status()
+    print_xml_data(xml_root_node)
     print("Time of query: ", time)
