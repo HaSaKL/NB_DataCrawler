@@ -2,6 +2,9 @@ import urllib.request
 import xml.etree.ElementTree as ElmTree
 import sqlite3
 import datetime
+import argparse
+import configparser
+import sys
 
 
 def get_url_from_db():
@@ -234,7 +237,101 @@ def add_current_station_info():
                           (int(query_time.timestamp()), place_uid, bikes))
     conn.commit()
 
+
+def get_place_from_city(conn, city_uid):
+    """Returns a list of places which belong to the provided city_uid"""
+    c = conn.cursor()
+    c.execute("SELECT places_cities_assignment.place_uid FROM places_cities_assignment "
+              "WHERE places_cities_assignment.city_uid = ?", (city_uid,))
+    # get list of one element tuples as result
+    res = c.fetchall()
+    # unpack list of tuples to list
+    res_list = [x[0] for x in res]
+    return res_list
+
+
+def get_city_from_domain(conn, domain):
+    """Returns a list of cities which belong to the provided domain"""
+    c = conn.cursor()
+    c.execute("SELECT cities_domains_assignment.city_uid FROM cities_domains_assignment "
+              "WHERE cities_domains_assignment.domain = ?", (domain,))
+    # get list of one element tuples as result
+    res = c.fetchall()
+    # unpack list of tuples to list
+    res_list = [x[0] for x in res]
+    return res_list
+
+
+def check_place(conn, place_uid):
+    """Returns true if the provided place_uid is valid"""
+    c = conn.cursor()
+    c.execute("SELECT 1 FROM places_data WHERE places_data.uid = ?", (place_uid,))
+    return bool(c.fetchone())
+
+
+def check_city(conn, city_uid):
+    """"Returns true, if the provided city_uid is valid"""
+    c = conn.cursor()
+    c.execute("SELECT 1 FROM city_data WHERE city_data.uid = ?", (city_uid,))
+    return bool(c.fetchone())
+
+
+def check_domain(conn, domain_id):
+    """"Returns true, if the provided domain is valid"""
+    c = conn.cursor()
+    c.execute("SELECT 1 FROM domain_data WHERE domain_data.domain = ?", (domain_id,))
+    return bool(c.fetchone())
+
+
+def read_places_uid(config_file, conn):
+    """"Takes the location/name.ini of a config file and reads uid of the places mentioned in the file"""
+    # make parser and open places config file
+    config = configparser.ConfigParser()
+    try:
+        assert config_file.endswith('.ini')
+        assert config.read(config_file)
+    except AssertionError:
+        sys.exit("Wrong Configuration File. File should exist and end with .ini")
+
+    # get a list of all stations
+    # fixme: needs refactoring very badly
+    places_list = list()
+    for section in config.sections():
+        if section == "domain":
+            for domain in config["domain"].values():
+                if check_domain(conn, domain):
+                    city_in_domain = get_city_from_domain(conn, domain)
+                    for city in city_in_domain:
+                        if check_city(conn, city):
+                            place_in_city = get_place_from_city(conn,city)
+                            for place in place_in_city:
+                                places_list.append(place)
+
+        elif section == "city_uid":
+            for city in config["city_uid"].values():
+                if check_city(conn, city):
+                    place_in_city = get_place_from_city(conn, city)
+                    for place in place_in_city:
+                        places_list.append(place)
+
+        elif section == "place_uid":
+            for place in config["place_uid"].values():
+                if check_place(conn, place):
+                    places_list.append(place)
+
+    # return list with unique places
+    return list(set(places_list))
+
+
+def ui_cli():
+    """"Parses the command line options an returns the corresponding namespace"""
+    parser = argparse.ArgumentParser(description="Get Data from NextBike Servers and Save it to a Database.")
+    parser.add_argument("-p", "--places", type=str, default="places.ini", help="an ini-File with places")
+    args = parser.parse_args()
+    return args
+
 if __name__ == '__main__':
-    xml_root_node, time = get_and_parse_station_status()
-    print_xml_data(xml_root_node)
-    print("Time of query: ", time)
+    db_conn = connect_stations_master_db()
+    place_list = read_places_uid(args.places, db_conn)
+    print(place_list)
+    print(len(place_list))
