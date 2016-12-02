@@ -332,6 +332,7 @@ def ui_cli():
 
 if __name__ == '__main__':
     db_conn = connect_stations_master_db()
+    args = ui_cli()
     place_list = read_places_uid(args.places, db_conn)
     print(place_list)
     print(len(place_list))
