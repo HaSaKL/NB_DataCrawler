@@ -9,8 +9,10 @@ class NBStationsDataDB:
     def __init__(self, transactions_db_name="stations_transactions.db", master_data_db_name="stations_master.db",
                  login_data_db_name="login.db"):
         """"Creates a database connection at initialization and establishes base DB-structure if necessary,
-               also creates an NBMasterDataDB Object"""
+               also creates an NBMasterDataDB Object and fills it"""
         self.master_db = NBMasterDataDB.NBMasterDataDB(master_data_db_name, login_data_db_name)
+        self.master_db.fill_if_empty()
+
         self.conn = sqlite3.connect(transactions_db_name)
         c = self.conn.cursor()
         # check if database contains a table with transaction data; create table if necessary
@@ -23,7 +25,7 @@ class NBStationsDataDB:
     def add_state(self, status_xml, status_time):
         """"Adds a state defined by an status_xml and a time to the database"""
         c = self.conn.cursor()
-        assert isinstance(status_xml, ElmTree.Element)
+
         for domain in status_xml:
             for city in domain:
                 for place in city:
@@ -33,7 +35,27 @@ class NBStationsDataDB:
                               (int(status_time.timestamp()), place_uid, bikes))
         self.conn.commit()
 
-    def add_current_state(self):
-        """Downloads the current state and adds it to the database"""
+    def add_current_state(self, places_list = []):
+        """Downloads the current state and adds it to the database, if station list is provided,
+        only add stations from list"""
+
+        # get snapshot of station  and make sure it is a valid ElmTree
         status_xml, status_time = self.master_db.get_station_status(True)
-        self.add_state(status_xml, status_time)
+        assert isinstance(status_xml, ElmTree.Element)
+
+        if not len(places_list) > 0:
+            # if no places are specified, add all places to DB
+            self.add_state(status_xml, status_time)
+        else:
+            # if places are specified, go through entire results file but only add data for the places specified
+            c = self.conn.cursor()
+
+            for domain in status_xml:
+                for city in domain:
+                    for place in city:
+                        place_uid = place.attrib.get("uid")
+                        bikes = place.attrib.get("bikes")
+                        if int(place_uid) in places_list:
+                            c.execute("INSERT OR IGNORE INTO stations_fill VALUES (?, ?, ?)",
+                                      (int(status_time.timestamp()), place_uid, bikes))
+            self.conn.commit()

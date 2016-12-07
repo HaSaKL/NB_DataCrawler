@@ -31,6 +31,13 @@ class NBMasterDataDB:
             c.execute("CREATE TABLE `cities_domains_assignment` ( `domain` TEXT NOT NULL, `city_uid` INTEGER, "
                       "UNIQUE ( `domain`, `city_uid`) ) ")
 
+    def fill_if_empty(self):
+        """"Makes sure there is data in the master data db. If nothing exists, if will be filled."""
+        c = self.conn.cursor()
+        c.execute("SELECT '1' FROM places_data LIMIT 1")
+        if len(c.fetchall()) < 1:
+            self.update_db()
+
     def check_place(self, place_uid):
         """Returns true if the provided place_uid is valid"""
         c = self.conn.cursor()
@@ -83,24 +90,24 @@ class NBMasterDataDB:
         """"Returns an XML Tree and time of query for the latest status. If current == True,
         it will get the current status"""
         if current:
-            self.download_station_status()
-            self.parse_station_status()
+            self._download_station_status()
+            self._parse_station_status()
         return self.status_xml, self.status_time
 
-    def download_station_status(self):
+    def _download_station_status(self):
         """" Opens the Stations-status url and saves the result"""
         url = self.login_db.get_url("StationList")
         response = urllib.request.urlopen(url)
         self.status_xml_raw = response.read().decode()
 
-    def parse_station_status(self):
+    def _parse_station_status(self):
         """Returns an XML-object with the current status of all stations world-wide and a datetime of query as tuple"""
         success = False
         num_tries = 0
 
         # check if status file as been downloaded. If not, do so
         if not hasattr(self, "status_xml"):
-            self.download_station_status()
+            self._download_station_status()
 
         # Parse XML, an if necessary download again if file is corrupt,
         # often for corrupt files getting the time will go wrong
@@ -118,17 +125,16 @@ class NBMasterDataDB:
                 num_tries += 1
                 print("Problems Downloading Current Stations List Connection try ", num_tries - 1,
                       "failed. Will try again")
-                self.download_station_status()
+                self._download_station_status()
 
         assert isinstance(self.status_xml, ElmTree.Element)
         if not success:
             raise ValueError('Could not get Station Data or Parse received XML-File')
 
-
-
     def update_db(self):
         """"Updates the stations master data records"""
-        self.parse_station_status()
+        self._download_station_status()
+        self._parse_station_status()
         self._update_domain_table()
         self._update_city_table()
         self._update_cities_domain_assign_table()
@@ -149,7 +155,7 @@ class NBMasterDataDB:
         try:
             assert isinstance(self.status_xml, ElmTree.ElementTree)
         except AssertionError:
-            self.parse_station_status()
+            self._parse_station_status()
 
     def _update_city_table(self):
         """"Writes general city data from a provided xml-file to the database"""
