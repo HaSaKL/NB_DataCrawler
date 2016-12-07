@@ -1,12 +1,10 @@
 import argparse
 import configparser
 import sys
-import NBLoginDB
 import NBMasterDataDB
-import NBStationsDataDB
 
 
-def read_places_uid(config_file, master_db):
+def parse_place_config(config_file, master_db):
     """"Takes the location/name.ini of a config file and reads uid of the places mentioned in the file"""
     # make parser and open places config file
     config = configparser.ConfigParser()
@@ -17,25 +15,18 @@ def read_places_uid(config_file, master_db):
         sys.exit("Wrong Configuration File. File should exist and end with .ini")
 
     # get a list of all stations
-    # fixme: needs refactoring very badly
     places_list = list()
     for section in config.sections():
+
         if section == "domain":
             for domain in config["domain"].values():
                 if master_db.check_domain(domain):
-                    city_in_domain = master_db.get_cities_from_domain(domain)
-                    for city in city_in_domain:
-                        if master_db.check_city(city):
-                            place_in_city = master_db.get_places_from_city(city)
-                            for place in place_in_city:
-                                places_list.append(place)
+                    places_list.extend(master_db.get_places_from_domain(domain))
 
         elif section == "city_uid":
             for city in config["city_uid"].values():
                 if master_db.check_city(city):
-                    place_in_city = master_db.get_places_from_city(city)
-                    for place in place_in_city:
-                        places_list.append(place)
+                    places_list.extend(master_db.get_places_from_city())
 
         elif section == "place_uid":
             for place in config["place_uid"].values():
@@ -57,6 +48,6 @@ def ui_cli():
 if __name__ == '__main__':
     args = ui_cli()
     master_db = NBMasterDataDB.NBMasterDataDB()
-    place_list = read_places_uid(args.places, master_db)
+    place_list = parse_place_config(args.places, master_db)
     print(place_list)
     print(len(place_list))
