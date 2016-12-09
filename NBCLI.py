@@ -12,6 +12,7 @@ class NBCLI:
 
         parser.add_argument("-p", "--places", type=str, default="places.ini", help="ini-File with places")
         parser.add_argument("-d", "--database", type=str, default="database.ini", help="ini-File with data base info")
+        parser.add_argument("-l", "--logfile", type=str, default="db_log.log", help="file name for logging")
 
         self.cmdl_args = parser.parse_args()
 
@@ -82,7 +83,8 @@ class NBCLI:
         self._parse_cl()
         self._parse_database_config()
         self.master_data = NBMasterDataDB.NBMasterDataDB(master_data_db_name=self.stations_master_db_file,
-                                                         login_data_db_name=self.login_db_file)
+                                                         login_data_db_name=self.login_db_file,
+                                                         log_file=self.cmdl_args.logfile)
         # master data base needs to be filled in order to resolve the places list
         self.master_data.fill_if_empty()
         self.places_list = list()
