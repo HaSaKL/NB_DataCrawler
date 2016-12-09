@@ -3,18 +3,34 @@ import datetime
 import sqlite3
 import NBLoginDB
 import xml.etree.ElementTree as ElmTree
+import logging
 
 
 class NBMasterDataDB:
     """Class which defines an abstract interface to the master data base"""
 
-    def __init__(self, master_data_db_name="stations_master.db", login_data_db_name="login.db"):
+    def __init__(self, master_data_db_name="stations_master.db",
+                 login_data_db_name="login.db",
+                 log_file="master_data.log"):
         """"Creates a database connection at initialization and establishes base DB-structure if necessary,
         also creates an NBLoginDB Object"""
         self.status_xml = None
         self.status_time = None
+
+        # see if a logfile was set or if logging was disabled, if so, set logging flag to false or configure logging
+        if not log_file:
+            self.logging = False
+        else:
+            self.logging = True
+            #fixme: time format
+            logging.basicConfig(filename=log_file,
+                                level=logging.INFO,
+                                filemode='a',
+                                format='%(levelname)s:%(asctime)s:%(message)s')
+
         self.login_db = NBLoginDB.NBLoginDB(databasename=login_data_db_name)
         self.conn = sqlite3.connect(master_data_db_name)
+
         c = self.conn.cursor()
         # see if database contains five tables and construct them if required
         # noinspection SqlResolve
@@ -22,14 +38,24 @@ class NBMasterDataDB:
         if len(c.fetchall()) < 5:
             c.execute("CREATE TABLE `places_data` (`uid` INTEGER NOT NULL,`number` INTEGER, `spot` INTEGER, "
                       "`name` TEXT, `latitude` REAL, `longitude` REAL,`terminal_type` TEXT, PRIMARY KEY(`uid`))")
+            if self.logging:
+                logging.info("Set up table 'place_data'")
             c.execute("CREATE TABLE `city_data` ( `uid` INTEGER NOT NULL, `name` TEXT,`num_places` INTEGER, "
                       "`latitude` REAL, `longitude` REAL, PRIMARY KEY(`uid`) )")
+            if self.logging:
+                logging.info("Set up table 'city_data'")
             c.execute("CREATE TABLE `domain_data` ( `domain` TEXT NOT NULL, `name` TEXT NOT NULL, "
                       "`country` TEXT NOT NULL, `latitude` REAL, `longitude` REAL, PRIMARY KEY(`domain`) )")
+            if self.logging:
+                logging.info("Set up table 'domain_data'")
             c.execute("CREATE TABLE `places_cities_assignment` ( `place_uid` INTEGER NOT NULL, "
                       "`city_uid` INTEGER NOT NULL, UNIQUE (`place_uid`, `city_uid`) )")
+            if self.logging:
+                logging.info("Set up table 'place_city_assignment'")
             c.execute("CREATE TABLE `cities_domains_assignment` ( `domain` TEXT NOT NULL, `city_uid` INTEGER, "
                       "UNIQUE ( `domain`, `city_uid`) ) ")
+            if self.logging:
+                logging.info("Set up table 'cities_domain_assignment'")
 
     def fill_if_empty(self):
         """"Makes sure there is data in the master data db. If nothing exists, if will be filled."""
@@ -168,7 +194,11 @@ class NBMasterDataDB:
                 lat = city.attrib.get("lat")
                 lng = city.attrib.get("lng")
                 num_places = city.attrib.get("num_places")
-                c.execute("INSERT OR IGNORE INTO city_data VALUES (?, ?, ?, ?, ?)", (uid, name, num_places, lat, lng))
+                # check if record already exists and insert if not
+                c.execute("SELECT 1 FROM city_data WHERE city_data.uid = ?", (uid,))
+                if len(c.fetchall()) < 1:
+                    c.execute("INSERT INTO city_data VALUES (?, ?, ?, ?, ?)", (uid, name, num_places, lat, lng))
+                    logging.info("Inserted city %s (%s) to table city_data", uid, name)
         self.conn.commit()
 
     def _update_places_table(self):
@@ -185,8 +215,13 @@ class NBMasterDataDB:
                     lat = place.attrib.get("lat")
                     lng = place.attrib.get("lng")
                     terminal_type = place.attrib.get("terminal_type")
-                    c.execute("INSERT OR IGNORE INTO places_data VALUES (?, ?, ?, ?, ?, ?, ?)",
-                              (uid, number, spot, name, lat, lng, terminal_type))
+                    # check if record already exists and insert if not
+                    c.execute("SELECT 1 FROM places_data WHERE places_data.uid = ?", (uid,))
+                    if len(c.fetchall()) < 1:
+                        c.execute("INSERT INTO places_data VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                  (uid, number, spot, name, lat, lng, terminal_type))
+                        logging.info("Inserted place %s (%s) to table places_data", uid, name)
+
         self.conn.commit()
 
     def _update_domain_table(self):
@@ -199,8 +234,12 @@ class NBMasterDataDB:
             country = domain.attrib.get("country")
             lat = domain.attrib.get("lat")
             lng = domain.attrib.get("lng")
-            c.execute("INSERT OR IGNORE INTO domain_data VALUES (?, ?, ?, ?, ?)",
-                      (domain_item, name, country, lat, lng))
+            # check if record already exists and insert if not
+            c.execute("SELECT 1 FROM domain_data WHERE domain_data.domain = ?", (domain_item,))
+            if len(c.fetchall()) < 1:
+                c.execute("INSERT INTO domain_data VALUES (?, ?, ?, ?, ?)",
+                          (domain_item, name, country, lat, lng))
+                logging.info("Inserted domain %s (%s) to table domain_data", domain_item, name)
         self.conn.commit()
 
     def _update_cities_domain_assign_table(self):
