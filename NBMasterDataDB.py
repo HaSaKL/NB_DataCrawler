@@ -22,10 +22,10 @@ class NBMasterDataDB:
             self.logging = False
         else:
             self.logging = True
-            #fixme: time format
             logging.basicConfig(level=logging.INFO,
-                                format='%(levelname)s:%(asctime)s:%(message)s',
-                                handlers=[logging.FileHandler(log_file, 'a', 'utf-8')])
+                                format='%(asctime)s:%(message)s',
+                                handlers=[logging.FileHandler(log_file, 'a', 'utf-8')],
+                                datefmt="%Y-%m-%d %H.%M")
 
         self.login_db = NBLoginDB.NBLoginDB(databasename=login_data_db_name)
         self.conn = sqlite3.connect(master_data_db_name)
@@ -38,23 +38,23 @@ class NBMasterDataDB:
             c.execute("CREATE TABLE `places_data` (`uid` INTEGER NOT NULL,`number` INTEGER, `spot` INTEGER, "
                       "`name` TEXT, `latitude` REAL, `longitude` REAL,`terminal_type` TEXT, PRIMARY KEY(`uid`))")
             if self.logging:
-                logging.info("Set up table 'place_data'")
+                logging.info("Set up table: 'place_data'")
             c.execute("CREATE TABLE `city_data` ( `uid` INTEGER NOT NULL, `name` TEXT,`num_places` INTEGER, "
                       "`latitude` REAL, `longitude` REAL, PRIMARY KEY(`uid`) )")
             if self.logging:
-                logging.info("Set up table 'city_data'")
+                logging.info("Set up table: 'city_data'")
             c.execute("CREATE TABLE `domain_data` ( `domain` TEXT NOT NULL, `name` TEXT NOT NULL, "
                       "`country` TEXT NOT NULL, `latitude` REAL, `longitude` REAL, PRIMARY KEY(`domain`) )")
             if self.logging:
-                logging.info("Set up table 'domain_data'")
+                logging.info("Set up table: 'domain_data'")
             c.execute("CREATE TABLE `places_cities_assignment` ( `place_uid` INTEGER NOT NULL, "
                       "`city_uid` INTEGER NOT NULL, UNIQUE (`place_uid`, `city_uid`) )")
             if self.logging:
-                logging.info("Set up table 'place_city_assignment'")
+                logging.info("Set up table: 'place_city_assignment'")
             c.execute("CREATE TABLE `cities_domains_assignment` ( `domain` TEXT NOT NULL, `city_uid` INTEGER, "
                       "UNIQUE ( `domain`, `city_uid`) ) ")
             if self.logging:
-                logging.info("Set up table 'cities_domain_assignment'")
+                logging.info("Set up table: 'cities_domain_assignment'")
 
     def fill_if_empty(self):
         """"Makes sure there is data in the master data db. If nothing exists, if will be filled."""
