@@ -1,9 +1,10 @@
-import urllib.request
 import datetime
-import sqlite3
-import NBLoginDB
-import xml.etree.ElementTree as ElmTree
 import logging
+import sqlite3
+import urllib.request
+import xml.etree.ElementTree as ElmTree
+
+from NB_lib import NBLoginDB
 
 
 class NBMasterDataDB:

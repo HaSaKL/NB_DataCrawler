@@ -1,6 +1,7 @@
 import sqlite3
-import NBMasterDataDB
 import xml.etree.ElementTree as ElmTree
+
+from NB_lib import NBMasterDataDB
 
 
 class NBStationsDataDB:

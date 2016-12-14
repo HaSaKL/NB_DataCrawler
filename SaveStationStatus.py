@@ -1,5 +1,4 @@
-import NBCLI
-import NBStationsDataDB
+from NB_lib import NBCLI, NBStationsDataDB
 
 if __name__ == '__main__':
 

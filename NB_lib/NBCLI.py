@@ -1,6 +1,7 @@
 import argparse
 import configparser
-import NBMasterDataDB
+
+from NB_lib import NBMasterDataDB
 
 
 class NBCLI:
