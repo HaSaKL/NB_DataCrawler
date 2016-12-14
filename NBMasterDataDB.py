@@ -23,10 +23,9 @@ class NBMasterDataDB:
         else:
             self.logging = True
             #fixme: time format
-            logging.basicConfig(filename=log_file,
-                                level=logging.INFO,
-                                filemode='a',
-                                format='%(levelname)s:%(asctime)s:%(message)s')
+            logging.basicConfig(level=logging.INFO,
+                                format='%(levelname)s:%(asctime)s:%(message)s',
+                                handlers=[logging.FileHandler(log_file, 'a', 'utf-8')])
 
         self.login_db = NBLoginDB.NBLoginDB(databasename=login_data_db_name)
         self.conn = sqlite3.connect(master_data_db_name)
@@ -198,7 +197,7 @@ class NBMasterDataDB:
                 c.execute("SELECT 1 FROM city_data WHERE city_data.uid = ?", (uid,))
                 if len(c.fetchall()) < 1:
                     c.execute("INSERT INTO city_data VALUES (?, ?, ?, ?, ?)", (uid, name, num_places, lat, lng))
-                    logging.info("Inserted city %s (%s) to table city_data", uid, name)
+                    logging.info("New Insert to city_data: uid %s - %s", uid, name)
         self.conn.commit()
 
     def _update_places_table(self):
@@ -220,7 +219,7 @@ class NBMasterDataDB:
                     if len(c.fetchall()) < 1:
                         c.execute("INSERT INTO places_data VALUES (?, ?, ?, ?, ?, ?, ?)",
                                   (uid, number, spot, name, lat, lng, terminal_type))
-                        logging.info("Inserted place %s (%s) to table places_data", uid, name)
+                        logging.info("New Insert to places_data: uid %s - %s", uid, name)
 
         self.conn.commit()
 
@@ -239,7 +238,7 @@ class NBMasterDataDB:
             if len(c.fetchall()) < 1:
                 c.execute("INSERT INTO domain_data VALUES (?, ?, ?, ?, ?)",
                           (domain_item, name, country, lat, lng))
-                logging.info("Inserted domain %s (%s) to table domain_data", domain_item, name)
+                logging.info("New Insert to domain_data: domain %s - %s", domain_item, name)
         self.conn.commit()
 
     def _update_cities_domain_assign_table(self):
