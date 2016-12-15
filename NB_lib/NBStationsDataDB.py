@@ -8,10 +8,12 @@ class NBStationsDataDB:
     """Class which defines an abstract interface to the master data base"""
 
     def __init__(self, transactions_db_name="stations_transactions.db", master_data_db_name="stations_master.db",
-                 login_data_db_name="login.db"):
+                 login_data_db_name="login.db", log_file="db_log.log"):
         """"Creates a database connection at initialization and establishes base DB-structure if necessary,
                also creates an NBMasterDataDB Object and fills it"""
-        self.master_db = NBMasterDataDB.NBMasterDataDB(master_data_db_name, login_data_db_name)
+        self.master_db = NBMasterDataDB.NBMasterDataDB(login_data_db_name=login_data_db_name,
+                                                       master_data_db_name=master_data_db_name,
+                                                       log_file=log_file)
         self.master_db.fill_if_empty()
 
         self.conn = sqlite3.connect(transactions_db_name)

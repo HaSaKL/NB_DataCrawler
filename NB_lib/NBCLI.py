@@ -3,8 +3,6 @@ import configparser
 
 from NB_lib import NBMasterDataDB
 
-#fixme: add option for database logfile
-
 class NBCLI:
     """"Class which defines the interface to the CL, using configuration files and command line arguments"""
 
