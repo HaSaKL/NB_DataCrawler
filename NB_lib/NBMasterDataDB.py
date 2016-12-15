@@ -17,6 +17,7 @@ class NBMasterDataDB:
         also creates an NBLoginDB Object"""
         self.status_xml = None
         self.status_time = None
+        self.change_str = ""
 
         # see if a logfile was set or if logging was disabled, if so, set logging flag to false or configure logging
         if not log_file:
@@ -159,6 +160,8 @@ class NBMasterDataDB:
 
     def update_db(self):
         """"Updates the stations master data records"""
+        self.change_str = ""
+
         self._download_station_status()
         self._parse_station_status()
         self._update_domain_table()
@@ -166,6 +169,8 @@ class NBMasterDataDB:
         self._update_cities_domain_assign_table()
         self._update_places_table()
         self._update_places_cities_assign_table()
+
+        return self.change_str
 
     def print_master_data(self):
         """Prints the list of stations from the current-status-xml-file on screen"""
@@ -198,7 +203,12 @@ class NBMasterDataDB:
                 c.execute("SELECT 1 FROM city_data WHERE city_data.uid = ?", (uid,))
                 if len(c.fetchall()) < 1:
                     c.execute("INSERT INTO city_data VALUES (?, ?, ?, ?, ?)", (uid, name, num_places, lat, lng))
-                    logging.info("New Insert to city_data: uid %s - %s", uid, name)
+                    self.conn.commit()
+                    info = "New Insert to city_data for domain '{}': {} - '{}'".format(domain.attrib.get("name"),
+                                                                                         uid, name)
+                    logging.info(info)
+                    self.change_str += info + "\n"
+                    self.status_changed = True
         self.conn.commit()
 
     def _update_places_table(self):
@@ -220,7 +230,11 @@ class NBMasterDataDB:
                     if len(c.fetchall()) < 1:
                         c.execute("INSERT INTO places_data VALUES (?, ?, ?, ?, ?, ?, ?)",
                                   (uid, number, spot, name, lat, lng, terminal_type))
-                        logging.info("New Insert to places_data: uid %s - %s", uid, name)
+                        info = "New Insert to places_data for city '{}' in domain '{}': {} - '{}'".format(
+                            city.attrib.get("name"), domain.attrib.get("name"), uid, name)
+                        logging.info(info)
+                        self.change_str += info + "\n"
+                        self.status_changed = True
 
         self.conn.commit()
 
@@ -239,7 +253,10 @@ class NBMasterDataDB:
             if len(c.fetchall()) < 1:
                 c.execute("INSERT INTO domain_data VALUES (?, ?, ?, ?, ?)",
                           (domain_item, name, country, lat, lng))
-                logging.info("New Insert to domain_data: domain %s - %s", domain_item, name)
+                info = "New Insert to domain_data: '{}' - '{}'".format(domain_item, name)
+                logging.info(info)
+                self.change_str += info + "\n"
+                self.status_changed = True
         self.conn.commit()
 
     def _update_cities_domain_assign_table(self):

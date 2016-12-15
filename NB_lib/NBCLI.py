@@ -3,6 +3,7 @@ import configparser
 
 from NB_lib import NBMasterDataDB
 
+#fixme: add option for database logfile
 
 class NBCLI:
     """"Class which defines the interface to the CL, using configuration files and command line arguments"""
@@ -14,8 +15,45 @@ class NBCLI:
         parser.add_argument("-p", "--places", type=str, default="places.ini", help="ini-File with places")
         parser.add_argument("-d", "--database", type=str, default="database.ini", help="ini-File with data base info")
         parser.add_argument("-l", "--logfile", type=str, default="db_log.log", help="file name for logging")
+        parser.add_argument("-m", "--email", type=str, default="email.ini", help="email configuration for log alert")
 
         self.cmdl_args = parser.parse_args()
+
+    def _parse_email_config(self):
+        """" Takes the email.ini of a config file and stored the email info in the args"""
+
+        # make a parser and open the config gile
+        config = configparser.ConfigParser()
+        try:
+            assert self.cmdl_args.email.endswith('.ini')
+            assert config.read(self.cmdl_args.email)
+        except AssertionError:
+            raise AssertionError("Wrong type of Email configuration file. File should exist and end with .ini")
+
+        # get the email info from the file
+        if config.has_section("log-mail"):
+            self.log_email_status = True
+            if config.has_option("log-mail", "from"):
+                self.log_email_from = config.get("log-mail", "from")
+            else:
+                raise AssertionError("Please provide a sender Email for the log-mail in the email-configuration")
+
+            if config.has_option("log-mail", "to"):
+                self.log_email_to = config.get("log-mail", "to")
+            else:
+                raise AssertionError("Please provide a receiver Email for the log-mail in the email-configuration")
+
+            if config.has_option("log-mail", "smtp"):
+                self.log_email_smtp = config.get("log-mail", "smtp")
+            else:
+                raise AssertionError("Please provide an SMTP Server for the log-mail in the email-configuration")
+
+            if config.has_option("log-mail", "msg-prefix"):
+                self.log_email_prefix = config.get("log-mail", "msg-prefix")
+            else:
+                raise AssertionError("Please provide a message prefix for the log-mail in the email-configuration")
+        else:
+            self.log_email_status = False
 
     def _parse_database_config(self):
         """"Takes the database.ini of a config file and stores the database info in the args"""
@@ -26,7 +64,7 @@ class NBCLI:
             assert self.cmdl_args.database.endswith('.ini')
             assert config.read(self.cmdl_args.database)
         except AssertionError:
-            raise AssertionError("Wrong type of Database Configuration file. File should exist and end with .ini")
+            raise AssertionError("Wrong type of Database configuration file. File should exist and end with .ini")
 
         # get the database info from the file
         if config.has_option("login", "file"):
@@ -54,7 +92,7 @@ class NBCLI:
             assert self.cmdl_args.places.endswith('.ini')
             assert config.read(self.cmdl_args.places)
         except AssertionError:
-            raise AssertionError("Wrong type of Place Configuration file. File should exist and end with .ini")
+            raise AssertionError("Wrong type of Place configuration file. File should exist and end with .ini")
 
         # get a list of all stations
         for section in config.sections():
@@ -90,3 +128,4 @@ class NBCLI:
         self.master_data.fill_if_empty()
         self.places_list = list()
         self._parse_place_config()
+        self._parse_email_config()
