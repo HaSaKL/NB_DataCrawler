@@ -3,6 +3,7 @@ import configparser
 
 from NB_lib import NBMasterDataDB
 
+
 class NBCLI:
     """"Class which defines the interface to the CL, using configuration files and command line arguments"""
 
@@ -72,6 +73,7 @@ class NBCLI:
 
         if config.has_option("stations_master", "file"):
             self.stations_master_db_file = config.get("stations_master", "file")
+            self.stations_master_migration = config.get("stations_master", "latest_db_migration_name")
         else:
             self.stations_master_db_file = "def_stations_master.db"
 

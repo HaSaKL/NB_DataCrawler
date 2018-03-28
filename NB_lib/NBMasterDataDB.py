@@ -8,15 +8,17 @@ from NB_lib import NBLoginDB
 
 
 class NBMasterDataDB:
-    """Class which defines an abstract interface to the master data base"""
+    """Class which defines an interface to the master data base"""
 
     def __init__(self, master_data_db_name="stations_master.db",
                  login_data_db_name="login.db",
-                 log_file="master_data.log"):
+                 log_file="master_data.log",
+                 stations_master_migration="0001_PALACE_FIRST_SEEN_LAST_SEEN"):
         """"Creates a database connection at initialization and establishes base DB-structure if necessary,
         also creates an NBLoginDB Object"""
         self.status_xml = None
         self.status_time = None
+        self.stations_master_migration = stations_master_migration
         self.change_str = ""
 
         # see if a logfile was set or if logging was disabled, if so, set logging flag to false or configure logging
@@ -36,27 +38,38 @@ class NBMasterDataDB:
         # see if database contains five tables and construct them if required
         # noinspection SqlResolve
         c.execute("SELECT `tbl_name` FROM sqlite_master WHERE type = 'table'")
-        if len(c.fetchall()) < 5:
+        if len(c.fetchall()) < 6:
             c.execute("CREATE TABLE `places_data` (`uid` INTEGER NOT NULL,`number` INTEGER, `spot` INTEGER, "
-                      "`name` TEXT, `latitude` REAL, `longitude` REAL,`terminal_type` TEXT, PRIMARY KEY(`uid`))")
+                      "`name` TEXT, `bike_racks` INTEGER, `latitude` REAL, `longitude` REAL,"
+                      "`terminal_type` TEXT, PRIMARY KEY(`uid`))")
             if self.logging:
                 logging.info("Set up table: 'place_data'")
+
             c.execute("CREATE TABLE `city_data` ( `uid` INTEGER NOT NULL, `name` TEXT,`num_places` INTEGER, "
                       "`latitude` REAL, `longitude` REAL, PRIMARY KEY(`uid`) )")
             if self.logging:
                 logging.info("Set up table: 'city_data'")
+
             c.execute("CREATE TABLE `domain_data` ( `domain` TEXT NOT NULL, `name` TEXT NOT NULL, "
                       "`country` TEXT NOT NULL, `latitude` REAL, `longitude` REAL, PRIMARY KEY(`domain`) )")
             if self.logging:
                 logging.info("Set up table: 'domain_data'")
+
             c.execute("CREATE TABLE `places_cities_assignment` ( `place_uid` INTEGER NOT NULL, "
                       "`city_uid` INTEGER NOT NULL, UNIQUE (`place_uid`, `city_uid`) )")
             if self.logging:
                 logging.info("Set up table: 'place_city_assignment'")
+
             c.execute("CREATE TABLE `cities_domains_assignment` ( `domain` TEXT NOT NULL, `city_uid` INTEGER, "
                       "UNIQUE ( `domain`, `city_uid`) ) ")
             if self.logging:
                 logging.info("Set up table: 'cities_domain_assignment'")
+            c.execute("CREATE TABLE 'admin_migrations' ('id' INTEGER PRIMARY KEY , 'name' TEXT NOT NULL"
+                      ", 'applied' TIMESTAMP NOT NULL)")
+            c.execute("INSERT INTO 'admin_migrations' VALUES (NULL,?,current_timestamp)",
+                      (stations_master_migration, ))
+            if self.logging:
+                logging.info("Set up table: 'migrations'")
 
     def fill_if_empty(self):
         """"Makes sure there is data in the master data db. If nothing exists, if will be filled."""
@@ -160,16 +173,20 @@ class NBMasterDataDB:
 
     def update_db(self):
         """"Updates the stations master data records"""
-        self.change_str = ""
+        # check if migration is current
+        if self._check_migration():
+            # update db
+            self.change_str = ""
 
-        self._download_station_status()
-        self._parse_station_status()
-        self._update_domain_table()
-        self._update_city_table()
-        self._update_cities_domain_assign_table()
-        self._update_places_table()
-        self._update_places_cities_assign_table()
-
+            self._download_station_status()
+            self._parse_station_status()
+            self._update_domain_table()
+            self._update_city_table()
+            self._update_cities_domain_assign_table()
+            self._update_places_table()
+            self._update_places_cities_assign_table()
+        else:
+            raise ValueError('Database Scheme is not Current. Run migrations or fix database by hand')
         return self.change_str
 
     def print_master_data(self):
@@ -181,6 +198,16 @@ class NBMasterDataDB:
                 for place in city:
                     print(place.attrib.get("name"), "; ", place.tag, "-uid:", place.attrib.get("uid"))
             print("----------------------------------------------------")
+
+    def _check_migration(self):
+        """" Checks if the Database has the Scheme uses in  this script """
+        c = self.conn.cursor()
+        c.execute("SELECT name FROM admin_migrations ORDER BY name DESC LIMIT 1")
+        row = c.fetchone()
+        if row is None or row[0] != self.stations_master_migration:
+            return False
+        else:
+            return True
 
     def _check_status_integrity(self):
         try:
@@ -204,8 +231,8 @@ class NBMasterDataDB:
                 if len(c.fetchall()) < 1:
                     c.execute("INSERT INTO city_data VALUES (?, ?, ?, ?, ?)", (uid, name, num_places, lat, lng))
                     self.conn.commit()
-                    info = "New Insert to city_data for domain '{}': {} - '{}'".format(domain.attrib.get("name"),
-                                                                                         uid, name)
+                    info = "New Insert to city_data for domain '{}': {} - '{}'".format(domain.attrib.get("name"), uid,
+                                                                                       name)
                     logging.info(info)
                     self.change_str += info + "\n"
                     self.status_changed = True
@@ -221,21 +248,24 @@ class NBMasterDataDB:
                     uid = place.attrib.get("uid")
                     number = place.attrib.get("number")
                     name = place.attrib.get("name")
+                    bike_racks = place.attrib.get("bike_racks")
                     spot = place.attrib.get("spot")
                     lat = place.attrib.get("lat")
                     lng = place.attrib.get("lng")
                     terminal_type = place.attrib.get("terminal_type")
                     # check if record already exists and insert if not
                     c.execute("SELECT 1 FROM places_data WHERE places_data.uid = ?", (uid,))
-                    if len(c.fetchall()) < 1:
-                        c.execute("INSERT INTO places_data VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                  (uid, number, spot, name, lat, lng, terminal_type))
+                    if len(c.fetchall()) < 1: # record did not exist
+                        c.execute("INSERT INTO places_data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                  (uid, number, spot, name, bike_racks, lat, lng, terminal_type,
+                                   datetime.date.today(), datetime.date.today()))
                         info = "New Insert to places_data for city '{}' in domain '{}': {} - '{}'".format(
                             city.attrib.get("name"), domain.attrib.get("name"), uid, name)
                         logging.info(info)
                         self.change_str += info + "\n"
                         self.status_changed = True
-
+                    else: #record existed, update last seen
+                        c.execute("UPDATE places_data SET last_seen = ? WHERE uid = ?", (datetime.date.today(), uid))
         self.conn.commit()
 
     def _update_domain_table(self):

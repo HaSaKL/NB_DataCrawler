@@ -5,7 +5,7 @@ from NB_lib import NBMasterDataDB
 
 
 class NBStationsDataDB:
-    """Class which defines an abstract interface to the master data base"""
+    """Class which defines an abstract interface to the master database"""
 
     def __init__(self, transactions_db_name="stations_transactions.db", master_data_db_name="stations_master.db",
                  login_data_db_name="login.db", log_file="db_log.log"):
@@ -23,7 +23,7 @@ class NBStationsDataDB:
         c.execute("SELECT 1 FROM sqlite_master WHERE tbl_name = 'stations_fill' AND type = 'table'")
         if len(c.fetchall()) < 1:
             c.execute("CREATE TABLE `stations_fill` ( `timestamp` INTEGER NOT NULL, `place_uid` INTEGER NOT NULL, "
-                      "`bikes` INTEGER NOT NULL, UNIQUE ( `place_uid`, `timestamp`) ) ")
+                      "`bikes` INTEGER NOT NULL, `free_racks` INTEGER NOT NULL,UNIQUE ( `place_uid`, `timestamp`) ) ")
 
     def add_state(self, status_xml, status_time):
         """"Adds a state defined by an status_xml and a time to the database"""
@@ -34,11 +34,12 @@ class NBStationsDataDB:
                 for place in city:
                     place_uid = place.attrib.get("uid")
                     bikes = place.attrib.get("bikes")
-                    c.execute("INSERT OR IGNORE INTO stations_fill VALUES (?, ?, ?)",
-                              (int(status_time.timestamp()), place_uid, bikes))
+                    free_racks = place.attrib.get("free_racks")
+                    c.execute("INSERT OR IGNORE INTO stations_fill VALUES (?, ?, ?, ?)",
+                              (int(status_time.timestamp()), place_uid, bikes, free_racks))
         self.conn.commit()
 
-    def add_current_state(self, places_list = []):
+    def add_current_state(self, places_list=list()):
         """Downloads the current state and adds it to the database, if station list is provided,
         only add stations from list"""
 
@@ -58,7 +59,8 @@ class NBStationsDataDB:
                     for place in city:
                         place_uid = place.attrib.get("uid")
                         bikes = place.attrib.get("bikes")
+                        free_racks = place.attrib.get("free_racks")
                         if int(place_uid) in places_list:
-                            c.execute("INSERT OR IGNORE INTO stations_fill VALUES (?, ?, ?)",
-                                      (int(status_time.timestamp()), place_uid, bikes))
+                            c.execute("INSERT OR IGNORE INTO stations_fill VALUES (?, ?, ?, ?)",
+                                      (int(status_time.timestamp()), place_uid, bikes, free_racks))
             self.conn.commit()

@@ -11,7 +11,8 @@ if __name__ == '__main__':
     # open database
     master_data = NBMasterDataDB.NBMasterDataDB(master_data_db_name=config.stations_master_db_file,
                                                 login_data_db_name=config.login_db_file,
-                                                log_file=config.cmdl_args.logfile)
+                                                log_file=config.cmdl_args.logfile,
+                                                stations_master_migration=config.stations_master_migration)
 
     # check database, update if necessary, and detect changes
     changes_str = master_data.update_db()
