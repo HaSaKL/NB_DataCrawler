@@ -16,6 +16,9 @@ class NBCLI:
         parser.add_argument("-l", "--logfile", type=str, default="db_log.log", help="file name for logging")
         parser.add_argument("-m", "--email", type=str, default="email.ini", help="email configuration for log alert")
 
+        parser.add_argument("-f", "--datadir", type=str, default="..\\data\\nb_data195\\NB_DATA",
+                            help="path to dir with legacy xml files")
+
         self.cmdl_args = parser.parse_args()
 
     def _parse_email_config(self):

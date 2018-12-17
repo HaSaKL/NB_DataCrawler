@@ -25,7 +25,7 @@ class NBStationsDataDB:
             c.execute("CREATE TABLE `stations_fill` ( `timestamp` INTEGER NOT NULL, `place_uid` INTEGER NOT NULL, "
                       "`bikes` INTEGER NOT NULL, `free_racks` INTEGER NOT NULL,UNIQUE ( `place_uid`, `timestamp`) ) ")
 
-    def add_state(self, status_xml, status_time):
+    def add_state_domain_level(self, status_xml, status_time):
         """"Adds a state defined by an status_xml and a time to the database"""
         c = self.conn.cursor()
 
@@ -39,6 +39,24 @@ class NBStationsDataDB:
                               (int(status_time.timestamp()), place_uid, bikes, free_racks))
         self.conn.commit()
 
+    def add_state_country_level(self, status_xml, status_time):
+        """"Adds a state defined by an status_xml and a time to the database"""
+        c = self.conn.cursor()
+
+        for country in status_xml:
+            for city in country:
+                for place in city:
+                    place_uid = place.attrib.get("uid")
+                    bikes = place.attrib.get("bikes")
+                    if bikes == "5+":
+                        bikes = 5
+                    free_racks = place.attrib.get("free_racks")
+                    if free_racks is None:
+                        free_racks = 0
+                    c.execute("INSERT OR IGNORE INTO stations_fill VALUES (?, ?, ?, ?)",
+                              (int(status_time.timestamp()), place_uid, int(bikes), int(free_racks)))
+        self.conn.commit()
+
     def add_current_state(self, places_list=list()):
         """Downloads the current state and adds it to the database, if station list is provided,
         only add stations from list"""
@@ -49,7 +67,7 @@ class NBStationsDataDB:
 
         if not len(places_list) > 0:
             # if no places are specified, add all places to DB
-            self.add_state(status_xml, status_time)
+            self.add_state_domain_level(status_xml, status_time)
         else:
             # if places are specified, go through entire results file but only add data for the places specified
             c = self.conn.cursor()
